@@ -1,5 +1,5 @@
 # Beschrijving
-Dit is een familie trip plannings app, specifiek voor Londen en omgeving om een weekje weg te plannen door bezienswaardigeheden aan de klikken, te bekijken, de route met het OV te bepalen en de dagen uit te stippelen. De bedoeling is om er een PWA van te maken op https://londen.tweehuijsen.nl 
+Dit is een familie trip plannings app, specifiek voor Londen en omgeving om een weekje weg te plannen door bezienswaardigeheden aan de klikken, te bekijken, de route met het OV te bepalen en de dagen uit te stippelen.
 
 ## Instructies
 Toon na elke aanpassing, toevoeging, of fix welke files zijn aangepast zodat ik weet of ik een npm install moet doen of niet. Communiceer in het Nederlands.
