@@ -3,6 +3,7 @@ import { MapPin, Calendar, Compass, MessageCircle, X, Search, Plus, Navigation, 
 import { attractions, Attraction } from './data';
 import { chatWithAssistant, searchAttractions, getRouteSteps } from './gemini';
 import Markdown from 'react-markdown';
+import { pb } from './lib/pocketbase';
 
 import DiscoverTab from './components/DiscoverTab';
 import MapTab from './components/MapTab';
@@ -13,7 +14,7 @@ import AttractionModal from './components/AttractionModal';
 export type Tab = 'discover' | 'map' | 'itinerary' | 'saved';
 export type City = 'Londen' | 'Oxford';
 
-const APP_VERSION = 'v0.2.0';
+const APP_VERSION = 'v0.2.1';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<Tab>('discover');
@@ -45,6 +46,42 @@ export default function App() {
   ]);
   const [chatInput, setChatInput] = useState('');
   const [isChatLoading, setIsChatLoading] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3000);
+  };
+
+  useEffect(() => {
+    const fetchInitialData = async () => {
+      try {
+        const savedRecords = await pb.collection('saved_attractions').getFullList();
+        setSavedAttractions(savedRecords.map(r => r.attraction_id));
+
+        const itineraryRecords = await pb.collection('itinerary_items').getFullList();
+
+        setItinerary(prev => {
+          const newItinerary = { ...prev };
+          itineraryRecords.forEach(record => {
+            const attraction = attractions.find(a => a.id === record.attraction_id);
+            if (attraction && newItinerary[record.day]) {
+              // Vermijd duplicaten
+              if (!newItinerary[record.day].some(a => a.id === attraction.id)) {
+                newItinerary[record.day].push(attraction);
+              }
+            }
+          });
+          return newItinerary;
+        });
+      } catch (err) {
+        console.error("PocketBase connection failed on init:", err);
+        showToast("Kon opgeslagen data niet ophalen. Offline modus actief.");
+      }
+    };
+
+    fetchInitialData();
+  }, []);
 
   useEffect(() => {
     if (selectedAttraction) {
@@ -156,6 +193,39 @@ export default function App() {
     }
   };
 
+  const toggleSavedAttraction = async (attraction: Attraction) => {
+    const isSaved = savedAttractions.includes(attraction.id);
+
+    // Optimistische UI update
+    setSavedAttractions(prev =>
+      isSaved ? prev.filter(id => id !== attraction.id) : [...prev, attraction.id]
+    );
+
+    try {
+      if (isSaved) {
+        // Find and delete the record
+        const records = await pb.collection('saved_attractions').getList(1, 1, {
+          filter: `attraction_id = "${attraction.id}"`
+        });
+        if (records.items.length > 0) {
+          await pb.collection('saved_attractions').delete(records.items[0].id);
+        }
+      } else {
+        // Create new record
+        await pb.collection('saved_attractions').create({
+          attraction_id: attraction.id
+        });
+      }
+    } catch (err) {
+      console.error("PocketBase update failed:", err);
+      showToast("Opslaan in de cloud mislukt.");
+      // Rollback
+      setSavedAttractions(prev =>
+        isSaved ? [...prev, attraction.id] : prev.filter(id => id !== attraction.id)
+      );
+    }
+  };
+
   const handleSendMessage = async () => {
     if (!chatInput.trim()) return;
     const newMessage = chatInput;
@@ -171,12 +241,34 @@ export default function App() {
     setIsChatLoading(false);
   };
 
-  const addToItinerary = (day: string, attraction: Attraction) => {
+  const addToItinerary = async (day: string, attraction: Attraction) => {
+    // Check for duplicates locally first
+    if (itinerary[day].some(a => a.id === attraction.id)) {
+      alert(`${attraction.name} staat al op ${day}!`);
+      return;
+    }
+
+    // Optimistische UI update
     setItinerary(prev => ({
       ...prev,
       [day]: [...prev[day], attraction]
     }));
-    alert(`${attraction.name} is toegevoegd aan ${day}!`);
+    showToast(`${attraction.name} is toegevoegd aan ${day}!`);
+
+    try {
+      await pb.collection('itinerary_items').create({
+        day: day,
+        attraction_id: attraction.id
+      });
+    } catch (err) {
+      console.error("PocketBase update failed for itinerary:", err);
+      showToast("Toevoegen in de cloud mislukt.");
+      // Rollback
+      setItinerary(prev => ({
+        ...prev,
+        [day]: prev[day].filter(a => a.id !== attraction.id)
+      }));
+    }
   };
 
   const openRoute = (attraction: Attraction) => {
@@ -306,7 +398,7 @@ export default function App() {
             setSelectedAttraction={setSelectedAttraction}
             setCurrentImageIndex={setCurrentImageIndex}
             savedAttractions={savedAttractions}
-            setSavedAttractions={setSavedAttractions}
+            toggleSavedAttraction={toggleSavedAttraction}
           />
         )}
         {activeTab === 'map' && (
@@ -333,10 +425,16 @@ export default function App() {
             setActiveTab={setActiveTab}
             setSelectedAttraction={setSelectedAttraction}
             setCurrentImageIndex={setCurrentImageIndex}
-            setSavedAttractions={setSavedAttractions}
+            toggleSavedAttraction={toggleSavedAttraction}
           />
         )}
       </div>
+
+      {toastMessage && (
+        <div className="fixed top-5 left-1/2 -translate-x-1/2 bg-slate-800 border border-slate-600 text-white px-6 py-3 rounded-full shadow-lg shadow-black/50 z-[2000] text-sm font-medium transition-all animate-fade-in-down">
+          {toastMessage}
+        </div>
+      )}
 
       {/* Floating Chat Button */}
       {!isChatOpen && (

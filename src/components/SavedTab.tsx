@@ -8,7 +8,7 @@ interface SavedTabProps {
   setActiveTab: (tab: 'discover' | 'map' | 'itinerary' | 'saved') => void;
   setSelectedAttraction: (attraction: Attraction | null) => void;
   setCurrentImageIndex: (index: number) => void;
-  setSavedAttractions: React.Dispatch<React.SetStateAction<string[]>>;
+  toggleSavedAttraction: (attraction: Attraction) => void;
 }
 
 export default function SavedTab({
@@ -17,7 +17,7 @@ export default function SavedTab({
   setActiveTab,
   setSelectedAttraction,
   setCurrentImageIndex,
-  setSavedAttractions
+  toggleSavedAttraction
 }: SavedTabProps) {
   const saved = attractions.filter(a => savedAttractions.includes(a.id));
 
@@ -53,7 +53,7 @@ export default function SavedTab({
                   className="absolute top-4 right-4 bg-slate-900/60 backdrop-blur-md p-2 rounded-full border border-white/10 z-10"
                   onClick={(e) => {
                     e.stopPropagation();
-                    setSavedAttractions(prev => prev.filter(id => id !== attraction.id));
+                    toggleSavedAttraction(attraction);
                   }}
                 >
                   <Heart className="w-5 h-5 fill-red-500 text-red-500" />
