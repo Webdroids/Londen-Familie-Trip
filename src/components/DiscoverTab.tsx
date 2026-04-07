@@ -15,7 +15,7 @@ interface DiscoverTabProps {
   setSelectedAttraction: (attraction: Attraction | null) => void;
   setCurrentImageIndex: (index: number) => void;
   savedAttractions: string[];
-  setSavedAttractions: React.Dispatch<React.SetStateAction<string[]>>;
+  toggleSavedAttraction: (attraction: Attraction) => void;
 }
 
 export default function DiscoverTab({
@@ -31,7 +31,7 @@ export default function DiscoverTab({
   setSelectedAttraction,
   setCurrentImageIndex,
   savedAttractions,
-  setSavedAttractions
+  toggleSavedAttraction
 }: DiscoverTabProps) {
   return (
     <div className="p-4 pb-24">
@@ -86,11 +86,7 @@ export default function DiscoverTab({
                 className="absolute top-4 right-4 bg-slate-900/60 backdrop-blur-md p-2 rounded-full border border-white/10 z-10"
                 onClick={(e) => {
                   e.stopPropagation();
-                  setSavedAttractions(prev =>
-                    prev.includes(attraction.id)
-                      ? prev.filter(id => id !== attraction.id)
-                      : [...prev, attraction.id]
-                  );
+                  toggleSavedAttraction(attraction);
                 }}
               >
                 <Heart className={`w-5 h-5 ${savedAttractions.includes(attraction.id) ? 'fill-red-500 text-red-500' : 'text-slate-300'}`} />
