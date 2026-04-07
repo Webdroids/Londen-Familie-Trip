@@ -96,9 +96,28 @@ export default function App() {
       }
     });
 
-    pb.collection('itinerary_items').subscribe('*', (e) => {
-      const attraction = e.record.attraction_data || attractions.find(a => a.id === e.record.attraction_id);
-      if (!attraction) return;
+    pb.collection('itinerary_items').subscribe('*', async (e) => {
+      // Bij een delete hebben we de volledige attraction data niet nodig, alleen het ID
+      if (e.action === 'delete') {
+        setItinerary(prev => {
+          const newItinerary = { ...prev };
+          Object.keys(newItinerary).forEach(day => {
+            newItinerary[day] = newItinerary[day].filter(a => a.id !== e.record.attraction_id);
+          });
+          return newItinerary;
+        });
+        return;
+      }
+
+      // Voor create/update proberen we de data te halen
+      let attraction = e.record.attraction_data || attractions.find(a => a.id === e.record.attraction_id);
+
+      // Als we het nog steeds niet hebben, probeer het via expand (als PocketBase dat ondersteunt)
+      if (!attraction && e.record.expand?.attraction_id) {
+        attraction = e.record.expand.attraction_id;
+      }
+
+      if (!attraction) return; // Mislukt om de attractie op te halen
 
       if (e.action === 'create') {
         setItinerary(prev => {
@@ -121,16 +140,8 @@ export default function App() {
           }
           return newItinerary;
         });
-      } else if (e.action === 'delete') {
-        setItinerary(prev => {
-          const newItinerary = { ...prev };
-          Object.keys(newItinerary).forEach(day => {
-            newItinerary[day] = newItinerary[day].filter(a => a.id !== attraction.id);
-          });
-          return newItinerary;
-        });
       }
-    });
+    }, { expand: 'attraction_id' });
 
     return () => {
       pb.collection('saved_attractions').unsubscribe('*');
@@ -345,9 +356,15 @@ export default function App() {
     }
   };
 
-  const fetchRouteSteps = (attraction: Attraction) => {
+  const fetchRouteSteps = async (attraction: Attraction, origin?: string) => {
     setIsFetchingRoute(true);
-    if (navigator.geolocation) {
+    if (origin) {
+      // Vanaf het opgegeven adres (bijv. het appartement)
+      const steps = await getRouteSteps(attraction.name, attraction.city, undefined, undefined, origin);
+      setRouteSteps(steps);
+      setIsFetchingRoute(false);
+    } else if (navigator.geolocation) {
+      // Vanaf huidige locatie
       navigator.geolocation.getCurrentPosition(
         async (position) => {
           const steps = await getRouteSteps(attraction.name, attraction.city, position.coords.latitude, position.coords.longitude);
@@ -355,16 +372,17 @@ export default function App() {
           setIsFetchingRoute(false);
         },
         async () => {
+          // Fallback indien locatie geweigerd wordt
           const steps = await getRouteSteps(attraction.name, attraction.city);
           setRouteSteps(steps);
           setIsFetchingRoute(false);
         }
       );
     } else {
-      getRouteSteps(attraction.name, attraction.city).then(steps => {
-        setRouteSteps(steps);
-        setIsFetchingRoute(false);
-      });
+      // Fallback
+      const steps = await getRouteSteps(attraction.name, attraction.city);
+      setRouteSteps(steps);
+      setIsFetchingRoute(false);
     }
   };
 
