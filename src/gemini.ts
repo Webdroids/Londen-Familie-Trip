@@ -59,10 +59,11 @@ export async function searchAttractions(query: string) {
 
 export async function getRouteSteps(destination: string, city: string, originLat?: number, originLng?: number, originAddress?: string) {
   let originText = originAddress ? `adres: ${originAddress}` : (originLat && originLng ? `mijn huidige locatie (coördinaten: ${originLat}, ${originLng})` : `het centrum van ${city}`);
+  const cache_key = `${destination}-${city}-${originLat || ''}-${originLng || ''}-${originAddress || ''}`;
 
   try {
     const cachedRecord = await pb.collection('route_cache').getFirstListItem(
-      pb.filter('destination = {:destination} && city = {:city} && origin = {:origin}', { destination, city, origin: originText })
+      pb.filter('cache_key = {:cache_key}', { cache_key })
     );
     if (cachedRecord && cachedRecord.steps) {
       return cachedRecord.steps;
@@ -94,7 +95,7 @@ export async function getRouteSteps(destination: string, city: string, originLat
       const steps = data.steps || ["Geen route gevonden."];
 
       try {
-        await pb.collection('route_cache').create({ destination, city, origin: originText, steps });
+        await pb.collection('route_cache').create({ cache_key, destination, city, origin: originText, steps });
       } catch (cacheError) {
         console.error("Failed to save to route_cache", cacheError);
       }
