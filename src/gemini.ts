@@ -1,10 +1,20 @@
 import { GoogleGenAI, Type } from '@google/genai';
+import { pb } from './lib/pocketbase';
 
 // process.env werkt niet in Vite browser builds tenzij geconfigureerd. We gebruiken import.meta.env
 const apiKey = import.meta.env.VITE_GEMINI_API_KEY || '';
 const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
 
 export async function searchAttractions(query: string) {
+  try {
+    const cachedRecord = await pb.collection('search_cache').getFirstListItem(pb.filter('query = {:query}', { query }));
+    if (cachedRecord && cachedRecord.results) {
+      return cachedRecord.results;
+    }
+  } catch (e) {
+    // Cache miss or error checking cache, proceed to call Gemini
+  }
+
   if (!ai) {
     console.error("Gemini API key is missing. Add VITE_GEMINI_API_KEY to your .env file.");
     return [];
@@ -28,7 +38,15 @@ export async function searchAttractions(query: string) {
     
     try {
       const data = JSON.parse(jsonString);
-      return data.results || [];
+      const results = data.results || [];
+
+      try {
+        await pb.collection('search_cache').create({ query, results });
+      } catch (cacheError) {
+        console.error("Failed to save to search_cache", cacheError);
+      }
+
+      return results;
     } catch (e) {
       console.error("Failed to parse Gemini response as JSON", text);
       return [];
@@ -40,13 +58,24 @@ export async function searchAttractions(query: string) {
 }
 
 export async function getRouteSteps(destination: string, city: string, originLat?: number, originLng?: number, originAddress?: string) {
+  let originText = originAddress ? `adres: ${originAddress}` : (originLat && originLng ? `mijn huidige locatie (coördinaten: ${originLat}, ${originLng})` : `het centrum van ${city}`);
+
+  try {
+    const cachedRecord = await pb.collection('route_cache').getFirstListItem(
+      pb.filter('destination = {:destination} && city = {:city} && origin = {:origin}', { destination, city, origin: originText })
+    );
+    if (cachedRecord && cachedRecord.steps) {
+      return cachedRecord.steps;
+    }
+  } catch (e) {
+    // Cache miss or error checking cache, proceed to call Gemini
+  }
+
   if (!ai) {
     console.error("Gemini API key is missing.");
     return ["Route ophalen mislukt omdat API key mist."];
   }
   try {
-    let originText = originAddress ? `adres: ${originAddress}` : (originLat && originLng ? `mijn huidige locatie (coördinaten: ${originLat}, ${originLng})` : `het centrum van ${city}`);
-    
     const response = await ai.models.generateContent({
       model: 'gemini-3.1-pro-preview',
       contents: `Je bent een behulpzame reisassistent. Geef een overzichtelijke, stapsgewijze routebeschrijving (bij voorkeur met openbaar vervoer of lopend) van ${originText} naar de bezienswaardigheid "${destination}" in ${city}. 
@@ -62,7 +91,15 @@ export async function getRouteSteps(destination: string, city: string, originLat
     
     try {
       const data = JSON.parse(jsonString);
-      return data.steps || ["Geen route gevonden."];
+      const steps = data.steps || ["Geen route gevonden."];
+
+      try {
+        await pb.collection('route_cache').create({ destination, city, origin: originText, steps });
+      } catch (cacheError) {
+        console.error("Failed to save to route_cache", cacheError);
+      }
+
+      return steps;
     } catch (e) {
       console.error("Failed to parse route JSON", text);
       return ["Kon de routebeschrijving niet verwerken."];
