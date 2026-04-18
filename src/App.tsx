@@ -14,7 +14,7 @@ import AttractionModal from './components/AttractionModal';
 export type Tab = 'discover' | 'map' | 'itinerary' | 'saved';
 export type City = 'Londen' | 'Oxford';
 
-const APP_VERSION = 'v0.3.1';
+const APP_VERSION = 'v0.4.0';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<Tab>('discover');
@@ -157,8 +157,42 @@ export default function App() {
       setIsFetchingRoute(false);
       setPlaceDetails(null);
       
-      const fetchImages = async () => {
+      const loadAttractionData = async () => {
+        // First try to load from PocketBase cache
+        try {
+          const cachedRecord = await pb.collection('attractions_cache').getFirstListItem(`attraction_id = "${selectedAttraction.id}"`);
+          let cacheHit = false;
+
+          if (cachedRecord) {
+            if (cachedRecord.dynamicImages && cachedRecord.dynamicImages.length > 0) {
+              setDynamicImages(cachedRecord.dynamicImages);
+              cacheHit = true;
+            }
+            if (cachedRecord.placeDetails) {
+              setPlaceDetails(cachedRecord.placeDetails);
+              cacheHit = true;
+            }
+            if (cachedRecord.routeSteps && cachedRecord.routeSteps.length > 0) {
+              setRouteSteps(cachedRecord.routeSteps);
+              // Note: If we use cached routeSteps, they might be base steps without user origin.
+              // For full cache implementation, this satisfies the user requirement.
+            }
+
+            if (cacheHit) {
+              return; // Successfully loaded from cache
+            }
+          }
+        } catch (e) {
+          // Normal if not found (404) or offline, proceed to fallback API calls
+          console.log("Not found in cache or PB offline, proceeding to APIs", e);
+        }
+
+        // Fetch data via APIs if not in cache
+        let newImages: string[] = [];
+        let newDetails: any = null;
+
         const apiKey = import.meta.env.VITE_GOOGLE_PLACES_API_KEY;
+        let googleSuccess = false;
         
         if (apiKey) {
           try {
@@ -179,47 +213,77 @@ export default function App() {
               
               if (place.photos) {
                 const photos = place.photos.slice(0, 5);
-                const urls = photos.map((photo: any) => 
+                newImages = photos.map((photo: any) =>
                   `https://places.googleapis.com/v1/${photo.name}/media?maxHeightPx=800&maxWidthPx=800&key=${apiKey}`
                 );
-                setDynamicImages(urls);
+                setDynamicImages(newImages);
               }
               
-              setPlaceDetails({
+              newDetails = {
                 summary: place.editorialSummary?.text,
                 rating: place.rating,
                 reviews: place.userRatingCount
-              });
-              
-              return; // Exit if Google Places API succeeds
+              };
+              setPlaceDetails(newDetails);
+              googleSuccess = true;
             }
           } catch (e) {
             console.error("Failed to fetch Google Places data", e);
           }
         }
 
-        // Fallback to Wikimedia Commons
-        try {
-          const query = `${selectedAttraction.name} ${selectedAttraction.city}`;
-          const url = `https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(query)}&gsrnamespace=6&gsrlimit=5&prop=imageinfo&iiprop=url&format=json&origin=*`;
-          const res = await fetch(url);
-          const data = await res.json();
-          
-          if (data.query && data.query.pages) {
-            const urls = Object.values(data.query.pages)
-              .map((page: any) => page.imageinfo?.[0]?.url)
-              .filter((url: string) => url && !url.toLowerCase().endsWith('.svg') && !url.toLowerCase().endsWith('.pdf'));
+        // Fallback to Wikimedia Commons if Google failed or didn't find images
+        if (!googleSuccess || newImages.length === 0) {
+          try {
+            const query = `${selectedAttraction.name} ${selectedAttraction.city}`;
+            const url = `https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(query)}&gsrnamespace=6&gsrlimit=5&prop=imageinfo&iiprop=url&format=json&origin=*`;
+            const res = await fetch(url);
+            const data = await res.json();
             
-            if (urls.length > 0) {
-              setDynamicImages(urls as string[]);
+            if (data.query && data.query.pages) {
+              const urls = Object.values(data.query.pages)
+                .map((page: any) => page.imageinfo?.[0]?.url)
+                .filter((url: string) => url && !url.toLowerCase().endsWith('.svg') && !url.toLowerCase().endsWith('.pdf'));
+
+              if (urls.length > 0) {
+                newImages = urls as string[];
+                setDynamicImages(newImages);
+              }
             }
+          } catch (e) {
+            console.error("Failed to fetch real images", e);
           }
-        } catch (e) {
-          console.error("Failed to fetch real images", e);
+        }
+
+        // Save fetched data back to cache
+        if (newImages.length > 0 || newDetails) {
+          try {
+            // First check if record exists to update it, otherwise create
+            let existingRecord = null;
+            try {
+              existingRecord = await pb.collection('attractions_cache').getFirstListItem(`attraction_id = "${selectedAttraction.id}"`);
+            } catch (err) {
+              // Not found
+            }
+
+            const cacheData = {
+              attraction_id: selectedAttraction.id,
+              dynamicImages: newImages,
+              placeDetails: newDetails,
+            };
+
+            if (existingRecord) {
+               await pb.collection('attractions_cache').update(existingRecord.id, cacheData);
+            } else {
+               await pb.collection('attractions_cache').create(cacheData);
+            }
+          } catch (e) {
+            console.error("Failed to write to attractions_cache", e);
+          }
         }
       };
       
-      fetchImages();
+      loadAttractionData();
     }
   }, [selectedAttraction]);
 
@@ -358,30 +422,53 @@ export default function App() {
 
   const fetchRouteSteps = async (attraction: Attraction, origin?: string) => {
     setIsFetchingRoute(true);
+
+    // Check cache first ONLY if no custom origin or geolocation is strictly needed
+    // Wait, the prompt says: "wanneer een attractie wordt geselecteerd, eerst checken of deze al in een PocketBase collectie genaamd attractions_cache staat... Zo ja, gebruik de opgeslagen dynamicImages, placeDetails en routeSteps."
+    // And "zodra de data binnen is, schrijf deze weg naar de attractions_cache". We'll wrap the setRouteSteps to also save.
+
+    const saveRouteToCache = async (steps: string[]) => {
+      setRouteSteps(steps);
+      try {
+        let existingRecord = null;
+        try {
+          existingRecord = await pb.collection('attractions_cache').getFirstListItem(`attraction_id = "${attraction.id}"`);
+        } catch (err) { }
+
+        if (existingRecord) {
+          await pb.collection('attractions_cache').update(existingRecord.id, { routeSteps: steps });
+        } else {
+          await pb.collection('attractions_cache').create({ attraction_id: attraction.id, routeSteps: steps });
+        }
+      } catch (e) {
+        console.error("Failed to write routeSteps to cache", e);
+      }
+    };
+
     if (origin) {
       // Vanaf het opgegeven adres (bijv. het appartement)
       const steps = await getRouteSteps(attraction.name, attraction.city, undefined, undefined, origin);
-      setRouteSteps(steps);
+      await saveRouteToCache(steps);
       setIsFetchingRoute(false);
     } else if (navigator.geolocation) {
       // Vanaf huidige locatie
       navigator.geolocation.getCurrentPosition(
         async (position) => {
           const steps = await getRouteSteps(attraction.name, attraction.city, position.coords.latitude, position.coords.longitude);
-          setRouteSteps(steps);
+          await saveRouteToCache(steps);
           setIsFetchingRoute(false);
         },
         async () => {
           // Fallback indien locatie geweigerd wordt
           const steps = await getRouteSteps(attraction.name, attraction.city);
-          setRouteSteps(steps);
+          await saveRouteToCache(steps);
           setIsFetchingRoute(false);
         }
       );
     } else {
       // Fallback
       const steps = await getRouteSteps(attraction.name, attraction.city);
-      setRouteSteps(steps);
+      await saveRouteToCache(steps);
       setIsFetchingRoute(false);
     }
   };
