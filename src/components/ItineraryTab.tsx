@@ -63,7 +63,7 @@ export default function ItineraryTab({
           </h2>
 
           {items.length === 0 ? (
-            <div className="bg-white dark:bg-white/50 dark:bg-slate-800/50 rounded-3xl p-8 text-center border border-dashed border-gray-200 dark:border-slate-700">
+            <div className="bg-slate-50 border-slate-200 dark:bg-slate-800/50 dark:border-slate-700 rounded-3xl p-8 text-center border border-dashed">
               <p className="text-slate-500 dark:text-slate-400 text-sm mb-4">Nog geen activiteiten gepland.</p>
               <button
                 onClick={() => setActiveTab('discover')}
@@ -78,7 +78,7 @@ export default function ItineraryTab({
                 const displayImage = imageDictionary[item.id] || item.imageUrls?.[0] || item.imageUrl;
 
                 return (
-                  <div key={`${item.id}-${idx}`} className="bg-white dark:bg-slate-800 p-4 rounded-3xl shadow-md border border-gray-200 dark:border-slate-700 flex items-center hover:border-gray-300 dark:border-slate-600 transition-colors">
+                  <div key={`${item.id}-${idx}`} className="bg-white dark:bg-slate-800 p-4 rounded-3xl shadow-md border border-slate-200 dark:border-slate-700 flex items-center hover:border-slate-300 dark:border-slate-600 transition-colors">
 
                     <div className="shrink-0 cursor-pointer" onClick={() => { setSelectedAttraction(item); setCurrentImageIndex(0); }}>
                       {displayImage ? (

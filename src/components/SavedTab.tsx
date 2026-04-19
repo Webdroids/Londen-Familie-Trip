@@ -41,7 +41,7 @@ export default function SavedTab({
             return (
               <div
                 key={attraction.id}
-                className="bg-white dark:bg-slate-800 rounded-3xl overflow-hidden shadow-lg border border-gray-200 dark:border-slate-700 cursor-pointer hover:border-gray-300 dark:border-slate-600 transition-colors"
+                className="bg-white dark:bg-slate-800 rounded-3xl overflow-hidden shadow-lg border border-slate-200 dark:border-slate-700 cursor-pointer hover:border-slate-300 dark:border-slate-600 transition-colors"
                 onClick={() => {
                   setSelectedAttraction(attraction);
                   setCurrentImageIndex(0);
@@ -53,7 +53,7 @@ export default function SavedTab({
                   ) : (
                     <div className="w-full h-full bg-gray-100 dark:bg-slate-700 animate-pulse"></div>
                   )}
-                  <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 to-transparent"></div>
+                  <div className="absolute inset-0 bg-gradient-to-t from-white/90 dark:from-slate-900/80 to-transparent"></div>
                 <div
                   className="absolute top-4 right-4 bg-gray-50 dark:bg-slate-900/60 backdrop-blur-md p-2 rounded-full border border-white/10 z-10"
                   onClick={(e) => {
@@ -63,8 +63,8 @@ export default function SavedTab({
                 >
                   <Heart className="w-5 h-5 fill-red-500 text-red-500" />
                 </div>
-                  <div className="absolute bottom-4 left-4 right-4">
-                    <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-1 drop-shadow-md">{attraction.name}</h3>
+                  <div className="absolute bottom-4 left-4 right-4 z-10">
+                    <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-1">{attraction.name}</h3>
                   </div>
                 </div>
               </div>

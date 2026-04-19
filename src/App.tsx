@@ -14,7 +14,7 @@ import AttractionModal from './components/AttractionModal';
 export type Tab = 'discover' | 'map' | 'itinerary' | 'saved';
 export type City = 'Londen' | 'Oxford';
 
-const APP_VERSION = 'v0.5.0';
+const APP_VERSION = 'v0.5.1';
 
 export async function fetchAttractionImages(attractionName: string, city: string): Promise<{images: string[], details: any}> {
   let newImages: string[] = [];
@@ -878,7 +878,7 @@ export default function App() {
       )}
 
       {/* Bottom Navigation */}
-      <div className="fixed bottom-0 w-full bg-white dark:bg-white/90 dark:bg-slate-800/90 backdrop-blur-lg border-t border-gray-200 dark:border-slate-700 px-6 py-4 flex justify-between items-center z-[900] pb-safe">
+      <div className="fixed bottom-0 w-full bg-white border-slate-200 dark:bg-slate-900/90 dark:border-slate-800 backdrop-blur-lg border-t px-6 py-4 flex justify-between items-center z-[1100] pb-safe">
         <button 
           onClick={() => setActiveTab('discover')}
           className={`flex flex-col items-center transition-colors ${activeTab === 'discover' ? 'text-blue-400' : 'text-slate-500 hover:text-slate-500 dark:text-slate-400'}`}

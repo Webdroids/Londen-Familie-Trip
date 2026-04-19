@@ -48,7 +48,7 @@ export default function AttractionModal({
   }
 
   return (
-    <div className="fixed inset-0 bg-gray-50 dark:bg-slate-900 z-[1000] overflow-y-auto pb-24">
+      <div className="fixed inset-0 bg-gray-50 dark:bg-slate-900 z-[1000] overflow-y-auto">
       <div className="relative h-80">
         <img src={images[currentImageIndex]} alt={a.name} className="w-full h-full object-cover transition-opacity duration-300" />
         <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/20 to-transparent"></div>
@@ -100,7 +100,7 @@ export default function AttractionModal({
 
       <div className="px-5 pt-16 pb-6">
         <div className="flex items-center space-x-2 mb-2">
-          <span className="bg-blue-900/50 text-blue-300 text-xs font-bold px-3 py-1 rounded-full border border-blue-800/50">{a.city}</span>
+          <span className="bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/50 dark:text-blue-300 dark:border-blue-800/50 text-xs font-bold px-3 py-1 rounded-full border">{a.city}</span>
         </div>
         <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-3">{a.name}</h1>
 
@@ -129,12 +129,12 @@ export default function AttractionModal({
         )}
 
         {a.ticketRequired && (
-          <div className="bg-blue-900/20 rounded-3xl p-6 mb-8 border border-blue-800/30">
+          <div className="bg-blue-50 border-blue-100 dark:bg-blue-900/20 dark:border-blue-800/30 rounded-3xl p-6 mb-8 border">
             <div className="flex items-center mb-3">
               <Ticket className="w-6 h-6 text-blue-400 mr-3" />
-              <h3 className="font-bold text-blue-100 text-lg">Tickets & Tijdsloten</h3>
+              <h3 className="font-bold text-blue-900 dark:text-blue-100 text-lg">Tickets & Tijdsloten</h3>
             </div>
-            <p className="text-blue-200/70 text-sm mb-5 leading-relaxed">
+            <p className="text-blue-900 dark:text-blue-200/70 text-sm mb-5 leading-relaxed">
               Vergeet niet om je tickets vooraf online te reserveren! {a.timeSlotRequired && 'Een tijdslot is verplicht.'}
             </p>
             {a.bookingUrl ? (
@@ -232,16 +232,16 @@ export default function AttractionModal({
         )}
 
         {a.familyTip && (
-          <div className="bg-green-900/20 rounded-3xl p-6 mb-8 border border-green-800/30">
+          <div className="bg-green-50 border-green-100 dark:bg-green-900/20 dark:border-green-800/30 rounded-3xl p-6 mb-8 border">
             <div className="flex items-center mb-3">
               <Info className="w-6 h-6 text-green-400 mr-3" />
-              <h3 className="font-bold text-green-100 text-lg">Familietip</h3>
+              <h3 className="font-bold text-green-900 dark:text-green-100 text-lg">Familietip</h3>
             </div>
-            <p className="text-green-200/80 text-sm leading-relaxed">{a.familyTip}</p>
+            <p className="text-green-900 dark:text-green-200/80 text-sm leading-relaxed">{a.familyTip}</p>
           </div>
         )}
 
-        <div className="flex space-x-4 mt-10">
+        <div className="flex space-x-4 mt-10 pb-28">
           <button
             onClick={() => setShowDaySelector(a)}
             className="flex-1 bg-blue-600 hover:bg-blue-500 text-slate-900 dark:text-white py-4 rounded-2xl font-bold flex items-center justify-center shadow-lg shadow-blue-900/20 transition-colors"
