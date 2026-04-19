@@ -34,7 +34,11 @@ export default function AttractionModal({
 
   // Gebruik de dynamisch ingeladen Wikimedia beelden, of val terug op de placeholders
   const fallbackImages = dynamicImages.length > 0 ? dynamicImages : (a.imageUrls && a.imageUrls.length > 0 ? a.imageUrls : []);
-  const images = Array.from(new Set([...fallbackImages, a.imageUrl])).filter(Boolean);
+  let images = Array.from(new Set([...fallbackImages, a.imageUrl])).filter(Boolean);
+
+  if (images.length === 0) {
+    images = ['https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?auto=format&fit=crop&q=80&w=1000'];
+  }
 
   return (
     <div className="fixed inset-0 bg-slate-900 z-[1000] overflow-y-auto pb-24">

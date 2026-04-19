@@ -86,6 +86,10 @@ export default function DiscoverTab({
             }
           }
 
+          if (!displayImage) {
+            displayImage = 'https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?auto=format&fit=crop&q=80&w=1000';
+          }
+
           return (
             <div
               key={attraction.id}
