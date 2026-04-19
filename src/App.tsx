@@ -14,7 +14,7 @@ import AttractionModal from './components/AttractionModal';
 export type Tab = 'discover' | 'map' | 'itinerary' | 'saved';
 export type City = 'Londen' | 'Oxford';
 
-const APP_VERSION = 'v0.4.2';
+const APP_VERSION = 'v0.4.3';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<Tab>('discover');
@@ -213,6 +213,12 @@ export default function App() {
           }
         }
 
+        // Final fallback: use Unsplash placeholder if both Google Places and Wikimedia Commons fail
+        if (newImages.length === 0) {
+          newImages = ['https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?auto=format&fit=crop&q=80&w=1000'];
+          setDynamicImages(newImages);
+        }
+
         // Save fetched data back to cache
         if (newImages.length > 0 || newDetails) {
           try {
@@ -282,12 +288,12 @@ export default function App() {
     } else {
       // Fallback to Gemini Maps search
       const results = await searchAttractions(`${searchQuery} in ${activeCity}`);
-      setSearchResults(results.map((r: any, i: number) => ({
-        id: `search-${i}`,
+      setSearchResults(results.map((r: any) => ({
+        id: `search-${r.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
         name: r.name,
         shortDescription: r.shortDescription || r.address,
         fullDescription: r.shortDescription || 'Geen uitgebreide beschrijving beschikbaar.',
-        imageUrl: r.imageUrl || 'https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?auto=format&fit=crop&q=80&w=1000', // placeholder
+        imageUrl: r.imageUrl || '',
         location: r.address,
         lat: r.lat,
         lng: r.lng,
