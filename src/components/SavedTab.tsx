@@ -21,14 +21,14 @@ export default function SavedTab({
 }: SavedTabProps) {
   return (
     <div className="p-4 pb-24 h-full overflow-y-auto">
-      <h1 className="text-2xl font-bold text-white mb-6 pt-4">Opgeslagen</h1>
+      <h1 className="text-2xl font-bold text-slate-900 dark:text-white mb-6 pt-4">Opgeslagen</h1>
 
       {savedAttractionsData.length === 0 ? (
-        <div className="bg-slate-800/50 rounded-3xl p-8 text-center border border-dashed border-slate-700">
-          <p className="text-slate-400 text-sm mb-4">Je hebt nog geen bezienswaardigheden opgeslagen.</p>
+        <div className="bg-white/50 dark:bg-slate-800/50 rounded-3xl p-8 text-center border border-dashed border-gray-200 dark:border-slate-700">
+          <p className="text-slate-500 dark:text-slate-400 text-sm mb-4">Je hebt nog geen bezienswaardigheden opgeslagen.</p>
           <button
             onClick={() => setActiveTab('discover')}
-            className="inline-flex items-center justify-center bg-slate-800 text-blue-400 font-bold text-sm px-6 py-3 rounded-xl border border-slate-700 hover:bg-slate-700 transition-colors"
+            className="inline-flex items-center justify-center bg-white dark:bg-slate-800 text-blue-400 font-bold text-sm px-6 py-3 rounded-xl border border-gray-200 dark:border-slate-700 hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"
           >
             <Search className="w-4 h-4 mr-2" /> Ontdekken
           </button>
@@ -41,7 +41,7 @@ export default function SavedTab({
             return (
               <div
                 key={attraction.id}
-                className="bg-slate-800 rounded-3xl overflow-hidden shadow-lg border border-slate-700 cursor-pointer hover:border-slate-600 transition-colors"
+                className="bg-white dark:bg-slate-800 rounded-3xl overflow-hidden shadow-lg border border-gray-200 dark:border-slate-700 cursor-pointer hover:border-gray-300 dark:border-slate-600 transition-colors"
                 onClick={() => {
                   setSelectedAttraction(attraction);
                   setCurrentImageIndex(0);
@@ -51,11 +51,11 @@ export default function SavedTab({
                   {displayImage ? (
                     <img src={displayImage} alt={attraction.name} className="w-full h-full object-cover" />
                   ) : (
-                    <div className="w-full h-full bg-slate-700 animate-pulse"></div>
+                    <div className="w-full h-full bg-gray-100 dark:bg-slate-700 animate-pulse"></div>
                   )}
                   <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 to-transparent"></div>
                 <div
-                  className="absolute top-4 right-4 bg-slate-900/60 backdrop-blur-md p-2 rounded-full border border-white/10 z-10"
+                  className="absolute top-4 right-4 bg-gray-50 dark:bg-slate-900/60 backdrop-blur-md p-2 rounded-full border border-white/10 z-10"
                   onClick={(e) => {
                     e.stopPropagation();
                     toggleSavedAttraction(attraction);
@@ -64,7 +64,7 @@ export default function SavedTab({
                   <Heart className="w-5 h-5 fill-red-500 text-red-500" />
                 </div>
                   <div className="absolute bottom-4 left-4 right-4">
-                    <h3 className="text-xl font-bold text-white mb-1 drop-shadow-md">{attraction.name}</h3>
+                    <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-1 drop-shadow-md">{attraction.name}</h3>
                   </div>
                 </div>
               </div>

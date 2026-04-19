@@ -50,14 +50,28 @@ export default function MapTab({
   const cityAttractions = attractions.filter(a => a.city === activeCity);
 
   return (
-    <div className="h-full w-full relative bg-slate-900 isolate z-0">
+    <div className="h-full w-full relative bg-gray-50 dark:bg-slate-900 isolate z-0">
+
       <div className="absolute top-4 left-4 right-4 z-[500] flex items-center justify-between pointer-events-none">
-        <h1 className="text-2xl font-bold text-white drop-shadow-md">Kaartoverzicht</h1>
+        <h1 className="text-2xl font-bold text-slate-900 dark:text-white drop-shadow-md">Kaartoverzicht</h1>
       </div>
+
+      {/* Floating Legend */}
+      <div className="absolute bottom-24 left-1/2 -translate-x-1/2 z-[500] bg-white dark:bg-slate-800 p-3 rounded-2xl shadow-xl border border-gray-200 dark:border-slate-700 pointer-events-auto flex gap-4 text-xs font-medium">
+        <div className="flex items-center gap-2">
+          <img src="https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-blue.png" alt="Blue pin" className="h-5" />
+          <span className="text-slate-700 dark:text-slate-600 dark:text-slate-300">Ontdekken</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <img src="https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-green.png" alt="Green pin" className="h-5" />
+          <span className="text-slate-700 dark:text-slate-600 dark:text-slate-300">In planning</span>
+        </div>
+      </div>
+
 
       <MapContainer center={center as any} zoom={13} style={{ height: '100%', width: '100%' }} zoomControl={false}>
         <TileLayer
-          url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+          url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
         />
         {cityAttractions.map((attraction) => {

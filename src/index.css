@@ -1,15 +1,30 @@
 @import "tailwindcss";
 
-/* Custom Leaflet Popup Styles for Dark Mode */
+@custom-variant dark (&:is(.dark *));
+
+/* Custom Leaflet Popup Styles for Light and Dark Mode */
 .custom-popup .leaflet-popup-content-wrapper {
+  background: #ffffff;
+  color: #0f172a;
+  border-radius: 1rem;
+  border: 1px solid #e2e8f0;
+}
+.dark .custom-popup .leaflet-popup-content-wrapper {
   background: #1e293b;
   color: #f8fafc;
-  border-radius: 1rem;
   border: 1px solid #334155;
 }
+
 .custom-popup .leaflet-popup-tip {
+  background: #ffffff;
+}
+.dark .custom-popup .leaflet-popup-tip {
   background: #1e293b;
 }
+
 .custom-popup .leaflet-popup-close-button {
+  color: #64748b !important;
+}
+.dark .custom-popup .leaflet-popup-close-button {
   color: #94a3b8 !important;
 }
