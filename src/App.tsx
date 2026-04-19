@@ -14,7 +14,7 @@ import AttractionModal from './components/AttractionModal';
 export type Tab = 'discover' | 'map' | 'itinerary' | 'saved';
 export type City = 'Londen' | 'Oxford';
 
-const APP_VERSION = 'v0.4.6';
+const APP_VERSION = 'v0.5.0';
 
 export async function fetchAttractionImages(attractionName: string, city: string): Promise<{images: string[], details: any}> {
   let newImages: string[] = [];
@@ -85,6 +85,22 @@ export async function fetchAttractionImages(attractionName: string, city: string
 }
 
 export default function App() {
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme) return savedTheme === 'dark';
+    return window.matchMedia('(prefers-color-scheme: dark)').matches;
+  });
+
+  useEffect(() => {
+    if (isDarkMode) {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('theme', 'light');
+    }
+  }, [isDarkMode]);
+
   const [activeTab, setActiveTab] = useState<Tab>('discover');
   const [activeCity, setActiveCity] = useState<City>('Londen');
   const [selectedAttraction, setSelectedAttraction] = useState<Attraction | null>(null);
@@ -453,6 +469,67 @@ export default function App() {
     }
   };
 
+  const removeFromItinerary = async (day: string, attraction: Attraction) => {
+    // Optimistische UI update
+    setItinerary(prev => ({
+      ...prev,
+      [day]: prev[day].filter(a => a.id !== attraction.id)
+    }));
+    showToast(`${attraction.name} verwijderd van ${day}`);
+
+    try {
+      const records = await pb.collection('itinerary_items').getList(1, 1, {
+        filter: `attraction_id = "${attraction.id}" && day = "${day}"`
+      });
+      if (records.items.length > 0) {
+        await pb.collection('itinerary_items').delete(records.items[0].id);
+      }
+    } catch (err) {
+      console.error("Failed to remove itinerary item from PocketBase:", err);
+      showToast("Verwijderen in de cloud mislukt.");
+      // Rollback
+      setItinerary(prev => ({
+        ...prev,
+        [day]: [...prev[day], attraction]
+      }));
+    }
+  };
+
+  const moveItineraryItem = async (fromDay: string, toDay: string, attraction: Attraction) => {
+    if (itinerary[toDay].some(a => a.id === attraction.id)) {
+      alert(`${attraction.name} staat al op ${toDay}!`);
+      return;
+    }
+
+    // Optimistische UI update
+    setItinerary(prev => ({
+      ...prev,
+      [fromDay]: prev[fromDay].filter(a => a.id !== attraction.id),
+      [toDay]: [...prev[toDay], attraction]
+    }));
+    showToast(`${attraction.name} verplaatst naar ${toDay}`);
+
+    try {
+      const records = await pb.collection('itinerary_items').getList(1, 1, {
+        filter: `attraction_id = "${attraction.id}" && day = "${fromDay}"`
+      });
+      if (records.items.length > 0) {
+        await pb.collection('itinerary_items').update(records.items[0].id, {
+          day: toDay
+        });
+      }
+    } catch (err) {
+      console.error("Failed to move itinerary item in PocketBase:", err);
+      showToast("Verplaatsen in de cloud mislukt.");
+      // Rollback
+      setItinerary(prev => ({
+        ...prev,
+        [fromDay]: [...prev[fromDay], attraction],
+        [toDay]: prev[toDay].filter(a => a.id !== attraction.id)
+      }));
+    }
+  };
+
   const openRoute = (attraction: Attraction) => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
@@ -618,26 +695,26 @@ export default function App() {
   }, [displayedAttractions]); // Removed attractionsCache and imageDictionary to prevent infinite loops
 
   const renderChat = () => (
-    <div className={`fixed inset-0 bg-slate-900 z-[1000] flex flex-col transition-transform duration-300 ${isChatOpen ? 'translate-y-0' : 'translate-y-full'}`}>
-      <div className="bg-slate-800 border-b border-slate-700 text-white p-5 flex items-center justify-between shadow-md pt-safe">
+    <div className={`fixed inset-0 bg-gray-50 dark:bg-slate-900 z-[1000] flex flex-col transition-transform duration-300 ${isChatOpen ? 'translate-y-0' : 'translate-y-full'}`}>
+      <div className="bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 text-slate-900 dark:text-white p-5 flex items-center justify-between shadow-md pt-safe">
         <div className="flex items-center">
           <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center mr-3 shadow-lg shadow-blue-900/20">
-            <MessageCircle className="w-5 h-5 text-white" />
+            <MessageCircle className="w-5 h-5 text-slate-900 dark:text-white" />
           </div>
           <div>
             <h2 className="font-bold text-lg">Reisassistent</h2>
-            <p className="text-xs text-slate-400">Altijd online</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Altijd online</p>
           </div>
         </div>
-        <button onClick={() => setIsChatOpen(false)} className="p-2 bg-slate-700 hover:bg-slate-600 rounded-full transition-colors">
+        <button onClick={() => setIsChatOpen(false)} className="p-2 bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 rounded-full transition-colors">
           <X className="w-5 h-5" />
         </button>
       </div>
       
-      <div className="flex-1 overflow-y-auto p-5 space-y-6 bg-slate-900">
+      <div className="flex-1 overflow-y-auto p-5 space-y-6 bg-gray-50 dark:bg-slate-900">
         {chatHistory.map((msg, idx) => (
           <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div className={`max-w-[85%] p-4 rounded-3xl ${msg.role === 'user' ? 'bg-blue-600 text-white rounded-tr-sm shadow-lg shadow-blue-900/20' : 'bg-slate-800 border border-slate-700 text-slate-200 rounded-tl-sm shadow-md'}`}>
+            <div className={`max-w-[85%] p-4 rounded-3xl ${msg.role === 'user' ? 'bg-blue-600 text-slate-900 dark:text-white rounded-tr-sm shadow-lg shadow-blue-900/20' : 'bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 rounded-tl-sm shadow-md'}`}>
               {msg.role === 'model' ? (
                 <div className="markdown-body text-sm prose prose-invert prose-sm max-w-none">
                   <Markdown>{msg.parts[0].text}</Markdown>
@@ -650,7 +727,7 @@ export default function App() {
         ))}
         {isChatLoading && (
           <div className="flex justify-start">
-            <div className="bg-slate-800 border border-slate-700 p-5 rounded-3xl rounded-tl-sm shadow-md flex space-x-2 items-center">
+            <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 p-5 rounded-3xl rounded-tl-sm shadow-md flex space-x-2 items-center">
               <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce"></div>
               <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
               <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
@@ -659,20 +736,20 @@ export default function App() {
         )}
       </div>
 
-      <div className="p-4 bg-slate-800 border-t border-slate-700 pb-safe">
-        <div className="flex items-center bg-slate-900 rounded-full p-1.5 pr-2 border border-slate-700 shadow-inner">
+      <div className="p-4 bg-white dark:bg-slate-800 border-t border-gray-200 dark:border-slate-700 pb-safe">
+        <div className="flex items-center bg-gray-50 dark:bg-slate-900 rounded-full p-1.5 pr-2 border border-gray-200 dark:border-slate-700 shadow-inner">
           <input 
             type="text" 
             value={chatInput}
             onChange={(e) => setChatInput(e.target.value)}
             onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
             placeholder="Vraag iets over Londen of Oxford..."
-            className="flex-1 bg-transparent px-4 py-3 text-white placeholder-slate-500 focus:outline-none text-sm"
+            className="flex-1 bg-transparent px-4 py-3 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none text-sm"
           />
           <button 
             onClick={handleSendMessage}
             disabled={!chatInput.trim() || isChatLoading}
-            className="bg-blue-600 hover:bg-blue-500 text-white p-3 rounded-full disabled:opacity-50 transition-colors shadow-lg shadow-blue-900/20"
+            className="bg-blue-600 hover:bg-blue-500 text-slate-900 dark:text-white p-3 rounded-full disabled:opacity-50 transition-colors shadow-lg shadow-blue-900/20"
           >
             <Navigation className="w-5 h-5 transform rotate-90" />
           </button>
@@ -682,7 +759,7 @@ export default function App() {
   );
 
   return (
-    <div className="h-screen w-full bg-slate-900 flex flex-col font-sans overflow-hidden text-slate-200 selection:bg-blue-500/30">
+    <div className="h-screen w-full bg-gray-50 dark:bg-slate-900 flex flex-col font-sans overflow-hidden text-slate-800 dark:text-slate-200 selection:bg-blue-500/30">
       
       {/* Main Content Area */}
       <div className="flex-1 overflow-y-auto">
@@ -703,6 +780,8 @@ export default function App() {
             toggleSavedAttraction={toggleSavedAttraction}
             attractionsCache={attractionsCache}
             imageDictionary={imageDictionary}
+            isDarkMode={isDarkMode}
+            setIsDarkMode={setIsDarkMode}
           />
         )}
         {activeTab === 'map' && (
@@ -721,6 +800,8 @@ export default function App() {
             setSelectedAttraction={setSelectedAttraction}
             setCurrentImageIndex={setCurrentImageIndex}
             imageDictionary={imageDictionary}
+            removeFromItinerary={removeFromItinerary}
+            moveItineraryItem={moveItineraryItem}
           />
         )}
         {activeTab === 'saved' && (
@@ -736,7 +817,7 @@ export default function App() {
       </div>
 
       {toastMessage && (
-        <div className="fixed top-5 left-1/2 -translate-x-1/2 bg-slate-800 border border-slate-600 text-white px-6 py-3 rounded-full shadow-lg shadow-black/50 z-[2000] text-sm font-medium transition-all animate-fade-in-down">
+        <div className="fixed top-5 left-1/2 -translate-x-1/2 bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-600 text-slate-900 dark:text-white px-6 py-3 rounded-full shadow-lg shadow-black/50 z-[2000] text-sm font-medium transition-all animate-fade-in-down">
           {toastMessage}
         </div>
       )}
@@ -745,7 +826,7 @@ export default function App() {
       {!isChatOpen && (
         <button 
           onClick={() => setIsChatOpen(true)}
-          className="fixed bottom-24 right-5 bg-blue-600 text-white p-4 rounded-full shadow-[0_8px_30px_rgb(0,0,0,0.4)] shadow-blue-900/50 hover:bg-blue-500 transition-all z-[900] flex items-center justify-center border border-blue-500/50"
+          className="fixed bottom-24 right-5 bg-blue-600 text-slate-900 dark:text-white p-4 rounded-full shadow-[0_8px_30px_rgb(0,0,0,0.4)] shadow-blue-900/50 hover:bg-blue-500 transition-all z-[900] flex items-center justify-center border border-blue-500/50"
         >
           <MessageCircle className="w-7 h-7" />
         </button>
@@ -770,8 +851,8 @@ export default function App() {
       {/* Day Selector Modal */}
       {showDaySelector && (
         <div className="fixed inset-0 bg-black/60 z-[1050] flex items-center justify-center p-4 backdrop-blur-sm">
-          <div className="bg-slate-800 rounded-3xl p-6 w-full max-w-sm border border-slate-700 shadow-2xl">
-            <h3 className="text-xl font-bold text-white mb-4 text-center">Kies een dag</h3>
+          <div className="bg-white dark:bg-slate-800 rounded-3xl p-6 w-full max-w-sm border border-gray-200 dark:border-slate-700 shadow-2xl">
+            <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-4 text-center">Kies een dag</h3>
             <div className="grid grid-cols-2 gap-3">
               {Object.keys(itinerary).map(day => (
                 <button
@@ -780,7 +861,7 @@ export default function App() {
                     addToItinerary(day, showDaySelector);
                     setShowDaySelector(null);
                   }}
-                  className="bg-slate-700 hover:bg-blue-600 text-white py-3 rounded-xl font-medium transition-colors border border-slate-600 hover:border-blue-500"
+                  className="bg-gray-100 dark:bg-slate-700 hover:bg-blue-600 text-slate-900 dark:text-white py-3 rounded-xl font-medium transition-colors border border-gray-300 dark:border-slate-600 hover:border-blue-500"
                 >
                   {day}
                 </button>
@@ -788,7 +869,7 @@ export default function App() {
             </div>
             <button 
               onClick={() => setShowDaySelector(null)}
-              className="mt-6 w-full bg-slate-900 hover:bg-slate-950 text-slate-300 py-3 rounded-xl font-bold transition-colors border border-slate-800"
+              className="mt-6 w-full bg-gray-50 dark:bg-slate-900 hover:bg-gray-200 dark:bg-slate-950 text-slate-600 dark:text-slate-300 py-3 rounded-xl font-bold transition-colors border border-gray-200 dark:border-slate-800"
             >
               Annuleren
             </button>
@@ -797,31 +878,31 @@ export default function App() {
       )}
 
       {/* Bottom Navigation */}
-      <div className="fixed bottom-0 w-full bg-slate-800/90 backdrop-blur-lg border-t border-slate-700 px-6 py-4 flex justify-between items-center z-[900] pb-safe">
+      <div className="fixed bottom-0 w-full bg-white dark:bg-white/90 dark:bg-slate-800/90 backdrop-blur-lg border-t border-gray-200 dark:border-slate-700 px-6 py-4 flex justify-between items-center z-[900] pb-safe">
         <button 
           onClick={() => setActiveTab('discover')}
-          className={`flex flex-col items-center transition-colors ${activeTab === 'discover' ? 'text-blue-400' : 'text-slate-500 hover:text-slate-400'}`}
+          className={`flex flex-col items-center transition-colors ${activeTab === 'discover' ? 'text-blue-400' : 'text-slate-500 hover:text-slate-500 dark:text-slate-400'}`}
         >
           <Compass className="w-6 h-6 mb-1.5" />
           <span className="text-[10px] font-bold uppercase tracking-wider">Ontdek</span>
         </button>
         <button 
           onClick={() => setActiveTab('saved')}
-          className={`flex flex-col items-center transition-colors ${activeTab === 'saved' ? 'text-blue-400' : 'text-slate-500 hover:text-slate-400'}`}
+          className={`flex flex-col items-center transition-colors ${activeTab === 'saved' ? 'text-blue-400' : 'text-slate-500 hover:text-slate-500 dark:text-slate-400'}`}
         >
           <Heart className="w-6 h-6 mb-1.5" />
           <span className="text-[10px] font-bold uppercase tracking-wider">Opgeslagen</span>
         </button>
         <button 
           onClick={() => setActiveTab('map')}
-          className={`flex flex-col items-center transition-colors ${activeTab === 'map' ? 'text-blue-400' : 'text-slate-500 hover:text-slate-400'}`}
+          className={`flex flex-col items-center transition-colors ${activeTab === 'map' ? 'text-blue-400' : 'text-slate-500 hover:text-slate-500 dark:text-slate-400'}`}
         >
           <MapPin className="w-6 h-6 mb-1.5" />
           <span className="text-[10px] font-bold uppercase tracking-wider">Kaart</span>
         </button>
         <button 
           onClick={() => setActiveTab('itinerary')}
-          className={`flex flex-col items-center transition-colors ${activeTab === 'itinerary' ? 'text-blue-400' : 'text-slate-500 hover:text-slate-400'}`}
+          className={`flex flex-col items-center transition-colors ${activeTab === 'itinerary' ? 'text-blue-400' : 'text-slate-500 hover:text-slate-500 dark:text-slate-400'}`}
         >
           <Calendar className="w-6 h-6 mb-1.5" />
           <span className="text-[10px] font-bold uppercase tracking-wider">Planning</span>
