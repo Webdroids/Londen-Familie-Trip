@@ -8,7 +8,7 @@ interface AttractionModalProps {
   dynamicImages: string[];
   currentImageIndex: number;
   setCurrentImageIndex: React.Dispatch<React.SetStateAction<number>>;
-  placeDetails: {summary?: string, rating?: number, reviews?: number} | null;
+  placeDetails: {summary?: string, rating?: number, reviews?: number, openingHours?: any} | null;
   routeSteps: string[] | null;
   isFetchingRoute: boolean;
   fetchRouteSteps: (attraction: Attraction, origin?: string) => void;
@@ -46,6 +46,61 @@ export default function AttractionModal({
   if (images.length === 0) {
     images = [UNSPLASH_PLACEHOLDER];
   }
+
+  const checkIsOpen = () => {
+    if (!placeDetails || !placeDetails.openingHours || !placeDetails.openingHours.periods) {
+      return null; // Onbekend
+    }
+
+    const nu = new Date();
+    // getDay() gives 0 for Sunday, 1 for Monday etc.
+    // Google Places API periods.open.day gives 0 for Sunday, 1 for Monday etc.
+    const huidigeDag = nu.getDay();
+    const huidigeUur = nu.getHours();
+    const huidigeMinuut = nu.getMinutes();
+    const huidigeTijdInMinuten = huidigeUur * 60 + huidigeMinuut;
+
+    const periods = placeDetails.openingHours.periods;
+
+    // Als er precies 1 periode is met open.day === 0 en open.time === "0000" en geen close, dan is het 24/7 open
+    if (periods.length === 1 && periods[0].open && periods[0].open.day === 0 && periods[0].open.time === "0000" && !periods[0].close) {
+      return true;
+    }
+
+    for (const period of periods) {
+      if (!period.open || !period.close) continue;
+
+      const openDag = period.open.day;
+      const sluitDag = period.close.day;
+
+      const openUur = parseInt(period.open.time.substring(0, 2), 10);
+      const openMinuut = parseInt(period.open.time.substring(2, 4), 10);
+      const openTijdInMinuten = openUur * 60 + openMinuut;
+
+      const sluitUur = parseInt(period.close.time.substring(0, 2), 10);
+      const sluitMinuut = parseInt(period.close.time.substring(2, 4), 10);
+      const sluitTijdInMinuten = sluitUur * 60 + sluitMinuut;
+
+      // Zelfde dag open en dicht
+      if (openDag === sluitDag) {
+        if (huidigeDag === openDag && huidigeTijdInMinuten >= openTijdInMinuten && huidigeTijdInMinuten < sluitTijdInMinuten) {
+          return true;
+        }
+      } else {
+        // Sluitingstijd is op een volgende dag (na middernacht)
+        if (huidigeDag === openDag && huidigeTijdInMinuten >= openTijdInMinuten) {
+           return true; // We zijn na de openingstijd op de openingsdag
+        }
+        if (huidigeDag === sluitDag && huidigeTijdInMinuten < sluitTijdInMinuten) {
+           return true; // We zijn na middernacht maar voor de sluitingstijd op de sluitingsdag
+        }
+      }
+    }
+
+    return false; // Als geen enkele periode matcht, is het gesloten
+  };
+
+  const isOpen = checkIsOpen();
 
   return (
       <div className="fixed inset-0 bg-gray-50 dark:bg-slate-900 z-[1000] overflow-y-auto">
@@ -91,9 +146,21 @@ export default function AttractionModal({
           </div>
           <div className="text-right">
             <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">Status</div>
-            <div className="text-sm font-bold text-green-400 flex items-center justify-end">
-              <span className="w-2 h-2 rounded-full bg-green-400 mr-1.5 shadow-[0_0_8px_rgba(74,222,128,0.5)]"></span> Nu Open
-            </div>
+            {isOpen === true && (
+              <div className="text-sm font-bold text-green-500 flex items-center justify-end">
+                <span className="w-2 h-2 rounded-full bg-green-500 mr-1.5 shadow-[0_0_8px_rgba(34,197,94,0.5)]"></span> Nu Open
+              </div>
+            )}
+            {isOpen === false && (
+              <div className="text-sm font-bold text-red-500 flex items-center justify-end">
+                <span className="w-2 h-2 rounded-full bg-red-500 mr-1.5 shadow-[0_0_8px_rgba(239,68,68,0.5)]"></span> Gesloten
+              </div>
+            )}
+            {isOpen === null && (
+              <div className="text-sm font-bold text-slate-400 flex items-center justify-end">
+                <span className="w-2 h-2 rounded-full bg-slate-400 mr-1.5"></span> Onbekend
+              </div>
+            )}
           </div>
         </div>
       </div>
