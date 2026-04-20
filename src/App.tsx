@@ -14,7 +14,7 @@ import AttractionModal from './components/AttractionModal';
 export type Tab = 'discover' | 'map' | 'itinerary' | 'saved';
 export type City = 'Londen' | 'Oxford';
 
-const APP_VERSION = 'v0.5.4';
+const APP_VERSION = 'v0.5.5';
 
 export async function fetchAttractionImages(attractionName: string, city: string): Promise<{images: string[], details: any}> {
   let newImages: string[] = [];
@@ -31,7 +31,7 @@ export async function fetchAttractionImages(attractionName: string, city: string
         headers: {
           'Content-Type': 'application/json',
           'X-Goog-Api-Key': apiKey,
-          'X-Goog-FieldMask': 'places.photos,places.editorialSummary,places.rating,places.userRatingCount'
+          'X-Goog-FieldMask': 'places.photos,places.editorialSummary,places.rating,places.userRatingCount,places.regularOpeningHours'
         },
         body: JSON.stringify({ textQuery: query })
       });
@@ -50,7 +50,8 @@ export async function fetchAttractionImages(attractionName: string, city: string
         newDetails = {
           summary: place.editorialSummary?.text,
           rating: place.rating,
-          reviews: place.userRatingCount
+          reviews: place.userRatingCount,
+          openingHours: place.regularOpeningHours
         };
         googleSuccess = true;
       }
@@ -116,7 +117,7 @@ export default function App() {
   const [savedAttractions, setSavedAttractions] = useState<string[]>([]);
   const [savedAttractionsData, setSavedAttractionsData] = useState<Attraction[]>([]);
   const [showDaySelector, setShowDaySelector] = useState<Attraction | null>(null);
-  const [placeDetails, setPlaceDetails] = useState<{summary?: string, rating?: number, reviews?: number} | null>(null);
+  const [placeDetails, setPlaceDetails] = useState<{summary?: string, rating?: number, reviews?: number, openingHours?: any} | null>(null);
   const [attractionsCache, setAttractionsCache] = useState<Record<string, any>>({});
   const [imageDictionary, setImageDictionary] = useState<Record<string, string>>({});
   
