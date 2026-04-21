@@ -43,16 +43,16 @@ export async function searchAttractions(query: string) {
       try {
         await pb.collection('search_cache').create({ query, results });
       } catch (cacheError) {
-        console.error("Failed to save to search_cache", cacheError);
+        console.warn("Failed to save to search_cache", cacheError);
       }
 
       return results;
     } catch (e) {
-      console.error("Failed to parse Gemini response as JSON", text);
+      console.warn("Failed to parse Gemini response as JSON", text);
       return [];
     }
   } catch (error) {
-    console.error("Error searching attractions:", error);
+    console.warn("Error searching attractions:", error);
     return [];
   }
 }
@@ -73,16 +73,18 @@ export async function getRouteSteps(destination: string, city: string, originLat
   }
 
   if (!ai) {
-    console.error("Gemini API key is missing.");
+    console.warn("Gemini API key is missing.");
     return ["Route ophalen mislukt omdat API key mist."];
   }
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
-      contents: `Je bent een behulpzame reisassistent. Geef een overzichtelijke, stapsgewijze routebeschrijving (bij voorkeur met openbaar vervoer of lopend) van ${originText} naar de bezienswaardigheid "${destination}" in ${city}. 
+      contents: `You are a backend JSON data generator for a tourist planning app. You MUST output valid JSON only. DO NOT apologize, DO NOT state your limitations, and DO NOT act as a real-time GPS. Generate a plausible, hypothetical step-by-step tourist route between the given locations. Return strictly the requested JSON structure.
+
+      Je bent een behulpzame reisassistent. Geef een overzichtelijke, stapsgewijze routebeschrijving (bij voorkeur met openbaar vervoer of lopend) van ${originText} naar de bezienswaardigheid "${destination}" in ${city}.
       Geef de resultaten terug in strikt JSON formaat met een array genaamd 'steps'. Elk element in de array is een string die één stap van de route beschrijft.`,
       config: {
-        tools: [{ googleMaps: {} }],
+        responseMimeType: "application/json",
       }
     });
 
@@ -97,17 +99,17 @@ export async function getRouteSteps(destination: string, city: string, originLat
       try {
         await pb.collection('route_cache').create({ cache_key, destination, city, origin: originText, steps });
       } catch (cacheError) {
-        console.error("Failed to save to route_cache", cacheError);
+        console.warn("Failed to save to route_cache", cacheError);
       }
 
       return steps;
     } catch (e) {
-      console.error("Failed to parse route JSON", text);
-      return ["Kon de routebeschrijving niet verwerken."];
+      console.warn("Failed to parse route JSON", text);
+      return ["Volg de borden naar de bestemming (geschatte route niet beschikbaar)."];
     }
   } catch (error) {
-    console.error("Error fetching route steps:", error);
-    return ["Kon de routebeschrijving momenteel niet ophalen. Gebruik de 'Route' knop om Google Maps te openen."];
+    console.warn("Error fetching route steps:", error);
+    return ["Volg de borden naar de bestemming (geschatte route niet beschikbaar)."];
   }
 }
 
