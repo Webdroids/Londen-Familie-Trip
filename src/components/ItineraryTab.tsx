@@ -23,6 +23,21 @@ export default function ItineraryTab({
 }: ItineraryTabProps) {
   const [moveModalItem, setMoveModalItem] = useState<{ attraction: Attraction, fromDay: string } | null>(null);
 
+  const getDayLabel = (dayString: string) => {
+    const match = dayString.match(/\d+/);
+    if (!match) return dayString;
+
+    const dayIndex = parseInt(match[0], 10);
+    const startDate = new Date(2026, 3, 22); // 22 April 2026 (Month is 0-indexed)
+    const currentDate = new Date(startDate);
+    currentDate.setDate(startDate.getDate() + (dayIndex - 1));
+
+    const options: Intl.DateTimeFormatOptions = { weekday: 'long', day: 'numeric', month: 'long' };
+    const dateString = currentDate.toLocaleDateString('nl-NL', options);
+
+    return `Dag ${dayIndex} - ${dateString}`;
+  };
+
   return (
     <div className="p-4 pb-24 h-full overflow-y-auto">
       <h1 className="text-2xl font-bold text-slate-900 dark:text-white mb-6 pt-4">Jullie Planning</h1>
@@ -31,7 +46,7 @@ export default function ItineraryTab({
         <div className="fixed inset-0 bg-black/60 z-[1050] flex items-center justify-center p-4 backdrop-blur-sm">
           <div className="bg-white dark:bg-slate-800 rounded-3xl p-6 w-full max-w-sm border border-gray-200 dark:border-slate-700 shadow-2xl">
             <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-4 text-center">Verplaats naar dag</h3>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3">
               {Object.keys(itinerary).map(d => (
                 <button
                   key={d}
@@ -42,7 +57,7 @@ export default function ItineraryTab({
                   className={`py-3 rounded-xl font-medium transition-colors border ${d === moveModalItem.fromDay ? 'bg-blue-600 text-slate-900 dark:text-white border-blue-500 cursor-not-allowed opacity-50' : 'bg-gray-100 dark:bg-slate-700 hover:bg-blue-600 text-slate-900 dark:text-white border-gray-300 dark:border-slate-600 hover:border-blue-500'}`}
                   disabled={d === moveModalItem.fromDay}
                 >
-                  {d}
+                  {getDayLabel(d)}
                 </button>
               ))}
             </div>
@@ -59,7 +74,7 @@ export default function ItineraryTab({
       {Object.entries(itinerary).map(([day, items]) => (
         <div key={day} className="mb-8">
           <h2 className="text-lg font-bold text-blue-400 mb-4 flex items-center">
-            <Calendar className="w-5 h-5 mr-2" /> {day}
+            <Calendar className="w-5 h-5 mr-2" /> {getDayLabel(day)}
           </h2>
 
           {items.length === 0 ? (
