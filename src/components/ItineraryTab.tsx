@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
-import { Calendar, Plus, MapPin, Trash2, ArrowRightLeft } from 'lucide-react';
+import { Calendar, Plus, MapPin, Trash2, ArrowRightLeft, GripVertical } from 'lucide-react';
 import { Attraction } from '../data';
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
+import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 interface ItineraryTabProps {
   itinerary: Record<string, Attraction[]>;
@@ -10,6 +13,79 @@ interface ItineraryTabProps {
   imageDictionary: Record<string, string>;
   removeFromItinerary: (day: string, attraction: Attraction) => void;
   moveItineraryItem: (fromDay: string, toDay: string, attraction: Attraction) => void;
+  reorderItineraryItem: (day: string, activeId: string, overId: string) => void;
+}
+
+function SortableItineraryItem({
+  item,
+  day,
+  idx,
+  displayImage,
+  setSelectedAttraction,
+  setCurrentImageIndex,
+  setMoveModalItem,
+  removeFromItinerary
+}: {
+  item: Attraction;
+  day: string;
+  idx: number;
+  displayImage: string;
+  setSelectedAttraction: (attraction: Attraction | null) => void;
+  setCurrentImageIndex: (index: number) => void;
+  setMoveModalItem: (item: { attraction: Attraction, fromDay: string }) => void;
+  removeFromItinerary: (day: string, attraction: Attraction) => void;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+  } = useSortable({ id: item.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} className="bg-white dark:bg-slate-800 p-4 rounded-3xl shadow-md border border-slate-200 dark:border-slate-700 flex items-center hover:border-slate-300 dark:border-slate-600 transition-colors">
+
+      {/* Drag Handle */}
+      <div {...attributes} {...listeners} className="mr-3 cursor-grab active:cursor-grabbing text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300">
+        <GripVertical className="w-5 h-5" />
+      </div>
+
+      <div className="shrink-0 cursor-pointer" onClick={() => { setSelectedAttraction(item); setCurrentImageIndex(0); }}>
+        {displayImage ? (
+          <img src={displayImage} alt={item.name} className="w-20 h-20 rounded-2xl object-cover mr-4" />
+        ) : (
+          <div className="w-20 h-20 rounded-2xl bg-gray-100 dark:bg-slate-700 animate-pulse mr-4"></div>
+        )}
+      </div>
+
+      <div className="flex-1 min-w-0 cursor-pointer" onClick={() => { setSelectedAttraction(item); setCurrentImageIndex(0); }}>
+        <h3 className="font-bold text-slate-900 dark:text-white text-lg truncate">{item.name}</h3>
+        <p className="text-xs text-slate-500 dark:text-slate-400 flex items-center mt-2 truncate">
+          <MapPin className="w-3 h-3 mr-1 shrink-0" /> <span className="truncate">{item.location?.split(',')[0] || 'Unknown location'}</span>
+        </p>
+      </div>
+      <div className="flex flex-col space-y-2 ml-2">
+        <button
+          onClick={(e) => { e.stopPropagation(); setMoveModalItem({ attraction: item, fromDay: day }); }}
+          className="p-2 bg-gray-100 dark:bg-slate-700 hover:bg-blue-600 rounded-full transition-colors text-slate-900 dark:text-white"
+        >
+          <ArrowRightLeft className="w-4 h-4" />
+        </button>
+        <button
+          onClick={(e) => { e.stopPropagation(); removeFromItinerary(day, item); }}
+          className="p-2 bg-gray-100 dark:bg-slate-700 hover:bg-red-600 rounded-full transition-colors text-slate-900 dark:text-white"
+        >
+          <Trash2 className="w-4 h-4" />
+        </button>
+      </div>
+    </div>
+  );
 }
 
 export default function ItineraryTab({
@@ -19,9 +95,22 @@ export default function ItineraryTab({
   setCurrentImageIndex,
   imageDictionary,
   removeFromItinerary,
-  moveItineraryItem
+  moveItineraryItem,
+  reorderItineraryItem
 }: ItineraryTabProps) {
   const [moveModalItem, setMoveModalItem] = useState<{ attraction: Attraction, fromDay: string } | null>(null);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor)
+  );
+
+  const handleDragEnd = (event: DragEndEvent, day: string) => {
+    const { active, over } = event;
+    if (over && active.id !== over.id) {
+      reorderItineraryItem(day, active.id as string, over.id as string);
+    }
+  };
 
   const getDayLabel = (dayString: string) => {
     const match = dayString.match(/\d+/);
@@ -88,45 +177,36 @@ export default function ItineraryTab({
               </button>
             </div>
           ) : (
-            <div className="space-y-4">
-              {items.map((item, idx) => {
-                const displayImage = imageDictionary[item.id] || item.imageUrls?.[0] || item.imageUrl;
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={(e) => handleDragEnd(e, day)}
+            >
+              <SortableContext
+                items={items.map(item => item.id)}
+                strategy={verticalListSortingStrategy}
+              >
+                <div className="space-y-4">
+                  {items.map((item, idx) => {
+                    const displayImage = imageDictionary[item.id] || item.imageUrls?.[0] || item.imageUrl || '';
 
-                return (
-                  <div key={`${item.id}-${idx}`} className="bg-white dark:bg-slate-800 p-4 rounded-3xl shadow-md border border-slate-200 dark:border-slate-700 flex items-center hover:border-slate-300 dark:border-slate-600 transition-colors">
-
-                    <div className="shrink-0 cursor-pointer" onClick={() => { setSelectedAttraction(item); setCurrentImageIndex(0); }}>
-                      {displayImage ? (
-                        <img src={displayImage} alt={item.name} className="w-20 h-20 rounded-2xl object-cover mr-4" />
-                      ) : (
-                        <div className="w-20 h-20 rounded-2xl bg-gray-100 dark:bg-slate-700 animate-pulse mr-4"></div>
-                      )}
-                    </div>
-
-                    <div className="flex-1 min-w-0 cursor-pointer" onClick={() => { setSelectedAttraction(item); setCurrentImageIndex(0); }}>
-                      <h3 className="font-bold text-slate-900 dark:text-white text-lg truncate">{item.name}</h3>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 flex items-center mt-2 truncate">
-                        <MapPin className="w-3 h-3 mr-1 shrink-0" /> <span className="truncate">{item.location?.split(',')[0] || 'Unknown location'}</span>
-                      </p>
-                    </div>
-                    <div className="flex flex-col space-y-2 ml-2">
-                      <button
-                        onClick={(e) => { e.stopPropagation(); setMoveModalItem({ attraction: item, fromDay: day }); }}
-                        className="p-2 bg-gray-100 dark:bg-slate-700 hover:bg-blue-600 rounded-full transition-colors text-slate-900 dark:text-white"
-                      >
-                        <ArrowRightLeft className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); removeFromItinerary(day, item); }}
-                        className="p-2 bg-gray-100 dark:bg-slate-700 hover:bg-red-600 rounded-full transition-colors text-slate-900 dark:text-white"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+                    return (
+                      <SortableItineraryItem
+                        key={item.id}
+                        item={item}
+                        day={day}
+                        idx={idx}
+                        displayImage={displayImage}
+                        setSelectedAttraction={setSelectedAttraction}
+                        setCurrentImageIndex={setCurrentImageIndex}
+                        setMoveModalItem={setMoveModalItem}
+                        removeFromItinerary={removeFromItinerary}
+                      />
+                    );
+                  })}
+                </div>
+              </SortableContext>
+            </DndContext>
           )}
         </div>
       ))}

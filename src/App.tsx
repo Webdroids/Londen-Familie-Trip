@@ -4,6 +4,7 @@ import { attractions, Attraction } from './data';
 import { chatWithAssistant, searchAttractions, getRouteSteps } from './gemini';
 import Markdown from 'react-markdown';
 import { pb } from './lib/pocketbase';
+import { arrayMove } from '@dnd-kit/sortable';
 
 import DiscoverTab from './components/DiscoverTab';
 import MapTab from './components/MapTab';
@@ -14,7 +15,7 @@ import AttractionModal from './components/AttractionModal';
 export type Tab = 'discover' | 'map' | 'itinerary' | 'saved';
 export type City = 'Londen' | 'Oxford';
 
-const APP_VERSION = 'v0.6.0';
+const APP_VERSION = 'v0.6.1';
 
 export async function fetchAttractionImages(attractionName: string, city: string): Promise<{images: string[], details: any}> {
   let newImages: string[] = [];
@@ -148,7 +149,7 @@ export default function App() {
         setSavedAttractions(savedRecords.map(r => r.attraction_id));
         setSavedAttractionsData(savedRecords.map(r => r.attraction_data || attractions.find(a => a.id === r.attraction_id)).filter(Boolean));
 
-        const itineraryRecords = await pb.collection('itinerary_items').getFullList();
+        const itineraryRecords = await pb.collection('itinerary_items').getFullList({ sort: 'sort_order' });
 
         setItinerary(prev => {
           const newItinerary = { ...prev };
@@ -472,7 +473,8 @@ export default function App() {
       await pb.collection('itinerary_items').create({
         day: day,
         attraction_id: attraction.id,
-        attraction_data: attraction
+        attraction_data: attraction,
+        sort_order: itinerary[day].length
       });
     } catch (err) {
       console.error("PocketBase update failed for itinerary:", err);
@@ -480,7 +482,7 @@ export default function App() {
       // Rollback
       setItinerary(prev => ({
         ...prev,
-        [day]: prev[day].filter(a => a.id !== attraction.id)
+        [day]: prev[day]
       }));
     }
   };
@@ -489,7 +491,7 @@ export default function App() {
     // Optimistische UI update
     setItinerary(prev => ({
       ...prev,
-      [day]: prev[day].filter(a => a.id !== attraction.id)
+      [day]: prev[day]
     }));
     showToast(`${attraction.name} verwijderd van ${day}`);
 
@@ -531,7 +533,8 @@ export default function App() {
       });
       if (records.items.length > 0) {
         await pb.collection('itinerary_items').update(records.items[0].id, {
-          day: toDay
+          day: toDay,
+          sort_order: itinerary[toDay].length
         });
       }
     } catch (err) {
@@ -542,6 +545,47 @@ export default function App() {
         ...prev,
         [fromDay]: [...prev[fromDay], attraction],
         [toDay]: prev[toDay].filter(a => a.id !== attraction.id)
+      }));
+    }
+  };
+
+  const reorderItineraryItem = async (day: string, activeId: string, overId: string) => {
+    const dayItems = itinerary[day];
+    const oldIndex = dayItems.findIndex(item => item.id === activeId);
+    const newIndex = dayItems.findIndex(item => item.id === overId);
+
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    const newOrder = arrayMove(dayItems, oldIndex, newIndex);
+
+    // Optimistic UI Update
+    setItinerary(prev => ({
+      ...prev,
+      [day]: newOrder
+    }));
+
+    try {
+      // Haal alle huidige records op voor deze dag
+      const records = await pb.collection('itinerary_items').getFullList({
+        filter: `day = "${day}"`
+      });
+
+      // Update de sort_order voor elk item via een Promise.all zodat alles sneller en veiliger wegschrijft
+      await Promise.all(newOrder.map((attraction, index) => {
+        const record = records.find(r => r.attraction_id === attraction.id);
+        if (record) {
+          return pb.collection('itinerary_items').update(record.id, {
+            sort_order: index
+          });
+        }
+      }));
+    } catch (err) {
+      console.error("Failed to reorder itinerary item in PocketBase:", err);
+      showToast("Volgorde opslaan in de cloud mislukt.");
+      // Rollback
+      setItinerary(prev => ({
+        ...prev,
+        [day]: dayItems
       }));
     }
   };
@@ -842,6 +886,7 @@ export default function App() {
             imageDictionary={imageDictionary}
             removeFromItinerary={removeFromItinerary}
             moveItineraryItem={moveItineraryItem}
+            reorderItineraryItem={reorderItineraryItem}
           />
         )}
         {activeTab === 'saved' && (
