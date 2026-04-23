@@ -15,7 +15,7 @@ import AttractionModal from './components/AttractionModal';
 export type Tab = 'discover' | 'map' | 'itinerary' | 'saved';
 export type City = 'Londen' | 'Oxford';
 
-const APP_VERSION = 'v0.6.1';
+const APP_VERSION = 'v0.6.3';
 
 export async function fetchAttractionImages(attractionName: string, city: string): Promise<{images: string[], details: any}> {
   let newImages: string[] = [];
@@ -145,6 +145,13 @@ export default function App() {
   useEffect(() => {
     const fetchInitialData = async () => {
       try {
+        // Authenticate anonymously before fetching to ensure PocketBase policies pass
+        if (!pb.authStore.isValid) {
+           await pb.collection('users').authWithPassword('guest', 'guest_password').catch(() => {
+             console.warn("Guest login failed. Attempting to fetch without auth.");
+           });
+        }
+
         const savedRecords = await pb.collection('saved_attractions').getFullList();
         setSavedAttractions(savedRecords.map(r => r.attraction_id));
         setSavedAttractionsData(savedRecords.map(r => r.attraction_data || attractions.find(a => a.id === r.attraction_id)).filter(Boolean));
@@ -549,7 +556,7 @@ export default function App() {
     }
   };
 
-  const reorderItineraryItem = async (day: string, activeId: string, overId: string) => {
+  const reorderItineraryItem = (day: string, activeId: string, overId: string) => {
     const dayItems = itinerary[day];
     const oldIndex = dayItems.findIndex(item => item.id === activeId);
     const newIndex = dayItems.findIndex(item => item.id === overId);
@@ -558,36 +565,39 @@ export default function App() {
 
     const newOrder = arrayMove(dayItems, oldIndex, newIndex);
 
-    // Optimistic UI Update
+    // Optimistic UI Update - Snel en synchroon
     setItinerary(prev => ({
       ...prev,
       [day]: newOrder
     }));
 
-    try {
-      // Haal alle huidige records op voor deze dag
-      const records = await pb.collection('itinerary_items').getFullList({
-        filter: `day = "${day}"`
-      });
+    // Async update in de achtergrond
+    (async () => {
+      try {
+        // Haal alle huidige records op voor deze dag
+        const records = await pb.collection('itinerary_items').getFullList({
+          filter: `day = "${day}"`
+        });
 
-      // Update de sort_order voor elk item via een Promise.all zodat alles sneller en veiliger wegschrijft
-      await Promise.all(newOrder.map((attraction, index) => {
-        const record = records.find(r => r.attraction_id === attraction.id);
-        if (record) {
-          return pb.collection('itinerary_items').update(record.id, {
-            sort_order: index
-          });
-        }
-      }));
-    } catch (err) {
-      console.error("Failed to reorder itinerary item in PocketBase:", err);
-      showToast("Volgorde opslaan in de cloud mislukt.");
-      // Rollback
-      setItinerary(prev => ({
-        ...prev,
-        [day]: dayItems
-      }));
-    }
+        // Update de sort_order voor elk item via een Promise.all
+        await Promise.all(newOrder.map((attraction, index) => {
+          const record = records.find(r => r.attraction_id === attraction.id);
+          if (record) {
+            return pb.collection('itinerary_items').update(record.id, {
+              sort_order: index
+            });
+          }
+        }));
+      } catch (err) {
+        console.error('DND update failed:', err);
+        showToast("Volgorde opslaan in de cloud mislukt.");
+        // Rollback on fail
+        setItinerary(prev => ({
+          ...prev,
+          [day]: dayItems
+        }));
+      }
+    })();
   };
 
   const openRoute = (attraction: Attraction) => {
