@@ -145,6 +145,13 @@ export default function App() {
   useEffect(() => {
     const fetchInitialData = async () => {
       try {
+        // Authenticate anonymously before fetching to ensure PocketBase policies pass
+        if (!pb.authStore.isValid) {
+           await pb.collection('users').authWithPassword('guest', 'guest_password').catch(() => {
+             console.warn("Guest login failed. Attempting to fetch without auth.");
+           });
+        }
+
         const savedRecords = await pb.collection('saved_attractions').getFullList();
         setSavedAttractions(savedRecords.map(r => r.attraction_id));
         setSavedAttractionsData(savedRecords.map(r => r.attraction_data || attractions.find(a => a.id === r.attraction_id)).filter(Boolean));
